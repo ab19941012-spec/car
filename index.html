@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>公務車冒險紀錄 | Emerald Version</title>
+    <title>公務車即時紀錄 | Emerald Version</title>
+    
+    <!-- 載入 Firebase SDK (版本 8.10.1) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
         /* 綠寶石配色標準 */
         :root {
-            --pk-bg-glass: #def2d0; /* 草原背景色 */
+            --pk-bg-glass: #def2d0; 
             --pk-dark-green: #388060;
             --pk-ui-border: #424242;
             --pk-window-bg: #f8f8f8;
-            --pk-name-tag: #ff5050; /* 藥丸紅色標籤 */
+            --pk-name-tag: #ff5050; 
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -38,51 +43,21 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
 
-        /* 經典頂部案號視窗 */
+        /* 頂部視窗 */
         .system-header {
             margin: 15px;
             background: var(--pk-window-bg);
             border: 5px double var(--pk-ui-border);
             padding: 15px;
-            box-shadow: 2px 2px 0 rgba(0,0,0,0.1);
         }
 
         .system-header h1 {
             font-size: 20px;
             color: var(--pk-dark-green);
             font-weight: 800;
-            margin-bottom: 5px;
         }
 
-        .system-header p {
-            font-size: 13px;
-            color: #666;
-            letter-spacing: 0.5px;
-        }
-
-        /* 行車平安提示框 */
-        .bless-box {
-            margin: 0 15px 15px;
-            background: #fff;
-            border: 3px solid var(--pk-ui-border);
-            border-radius: 4px;
-            padding: 12px;
-            position: relative;
-        }
-        .bless-box p {
-            font-size: 15px;
-            color: #1c3329;
-            line-height: 1.5;
-        }
-        .arrow {
-            position: absolute; bottom: 8px; right: 8px;
-            width: 0; height: 0;
-            border-left: 6px solid transparent; border-right: 6px solid transparent;
-            border-top: 8px solid var(--pk-dark-green);
-            animation: bounce 0.8s infinite;
-        }
-
-        /* 案由與車牌板 */
+        /* 車牌與廠商 */
         .info-panel {
             margin: 0 15px 15px;
             background: linear-gradient(135deg, #78b098 0%, #30A048 100%);
@@ -94,9 +69,8 @@
             color: #fff;
         }
         .plate-no { font-size: 28px; font-weight: bold; letter-spacing: 1px; }
-        .company-name { font-size: 11px; text-align: right; font-weight: bold; opacity: 0.9; }
 
-        /* PC 日曆區塊 */
+        /* 日曆區塊 */
         .pc-calendar {
             background: #fff;
             margin: 0 15px 30px;
@@ -109,7 +83,7 @@
             background: var(--pk-dark-green); padding: 5px; margin-bottom: 5px;
         }
         .calendar-nav select {
-            border: 2px solid #000; font-weight: bold; padding: 2px 6px; background: #eee; outline: none;
+            border: 2px solid #000; font-weight: bold; padding: 2px 6px; background: #eee;
         }
 
         .calendar-grid {
@@ -129,16 +103,14 @@
             flex-direction: column;
             align-items: center;
             padding: 5px 2px;
-            position: relative;
             cursor: pointer;
         }
-        .grid-day:active { background: #e0ffd0; }
         .grid-day.booked { background: #f1ffe8; }
         .grid-day.empty { background: transparent; pointer-events: none; }
 
-        .date-val { font-size: 16px; font-weight: bold; margin-bottom: 5px; color: #222; }
+        .date-val { font-size: 16px; font-weight: bold; color: #222; }
         
-        /* 人名標籤 */
+        /* 人名藥丸標籤 */
         .user-chip {
             width: 100%;
             background-color: var(--pk-name-tag);
@@ -147,50 +119,40 @@
             padding: 3px 0;
             text-align: center;
             border-radius: 4px;
-            font-weight: 500;
-            box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+            margin-top: auto;
             white-space: nowrap;
             overflow: hidden;
-            margin-top: auto;
         }
 
-        /* 浮動視窗 */
+        /* 對話視窗 */
         .modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.7);
             display: none; justify-content: center; align-items: center; z-index: 99;
         }
         .dialog-card {
-            background: #fff; border: 5px double var(--pk-ui-border); border-radius: 8px;
+            background: #fff; border: 5px double var(--pk-ui-border);
             padding: 25px; width: 85%; max-width: 320px;
-            box-shadow: 0 0 0 4px #fff;
         }
-        .dialog-card h3 { margin-bottom: 15px; font-size: 19px; color: var(--pk-dark-green); }
         .pk-input {
-            width: 100%; padding: 12px; border: 3px solid #000; font-size: 18px; outline: none; margin-bottom: 15px; background: #eee;
+            width: 100%; padding: 12px; border: 3px solid #000; font-size: 18px; margin-bottom: 15px; background: #eee;
         }
         .btn-pk {
             width: 100%; padding: 12px; border: 3px solid #000; font-size: 18px; font-weight: bold; cursor: pointer;
-            margin-top: 8px; text-align: left; position: relative; padding-left: 20px;
+            margin-top: 8px; text-align: left;
         }
-        .btn-pk::after { content: "▶"; position: absolute; left: 8px; opacity: 0; transition: opacity 0.2s; }
-        .btn-pk:hover::after { opacity: 1; }
-        .btn-yes { background: var(--pk-bg-glass); color: #000; }
-        .btn-no { background: #eee; }
+        .btn-yes { background: var(--pk-bg-glass); }
         .btn-del { background: #ff8a8a; }
 
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-        
-        /* Loading 效果 */
-        .loading-overlay {
-            position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.6);
-            color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px;
-            display: none; z-index: 1000;
+        /* 載入中提示 */
+        #sync-status {
+            position: fixed; top: 10px; right: 10px; background: #388060; color: white;
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; display: none;
         }
     </style>
 </head>
 <body>
 
-    <div id="loading" class="loading-overlay">同步中...</div>
+    <div id="sync-status">即時連線中...</div>
 
     <div class="handheld-view">
         <header class="system-header">
@@ -200,14 +162,7 @@
 
         <div class="info-panel">
             <div class="plate-no">AUA-7589</div>
-            <div class="company-name">
-                廠商名稱：<br>邑菖工程顧問有限公司
-            </div>
-        </div>
-
-        <div class="bless-box">
-            <p>加油！辛苦的一天。🚀<br>別忘了也幫車子加油。⛽</p>
-            <div class="arrow"></div>
+            <div style="font-size: 11px; text-align: right;">邑菖工程顧問有限公司</div>
         </div>
 
         <div class="pc-calendar">
@@ -218,17 +173,17 @@
             <div class="calendar-grid" id="mainGrid"></div>
         </div>
         
-        <p style="text-align:center; padding-bottom: 20px; font-size: 12px; color: #406050; font-weight: bold;">( 點擊日期格子進行登記或管理 )</p>
+        <p style="text-align:center; padding-bottom: 20px; font-size: 12px; color: #406050; font-weight: bold;">( 點擊日期格子即時登記 )</p>
     </div>
 
-    <!-- 浮動視窗系統 -->
+    <!-- 彈出視窗 -->
     <div class="modal" id="modalLayer" onclick="hideModal()">
         <div class="dialog-card" id="addWindow" onclick="event.stopPropagation()">
             <h3 id="targetDateStr">登記旅程</h3>
             <p style="font-size: 14px; margin-bottom:10px;">請在此留下您的大名：</p>
-            <input type="text" id="nameIn" class="pk-input" spellcheck="false">
+            <input type="text" id="nameIn" class="pk-input" placeholder="例如：張三">
             <button class="btn-pk btn-yes" onclick="save()">[ 確認 ] 我想預約</button>
-            <button class="btn-pk btn-no" onclick="hideModal()">[ 放棄 ] 離開</button>
+            <button class="btn-pk" onclick="hideModal()">[ 放棄 ] 離開</button>
         </div>
 
         <div class="dialog-card" id="delWindow" onclick="event.stopPropagation()" style="display:none;">
@@ -236,52 +191,44 @@
             <p style="font-size: 14px; margin-bottom:10px;" id="currentInfo"></p>
             <input type="password" id="delPw" class="pk-input" placeholder="管理員密碼">
             <button class="btn-pk btn-del" onclick="handleDel()">[ 強制 ] 刪除此紀錄</button>
-            <button class="btn-pk btn-no" onclick="hideModal()">[ 關閉 ] 返回系統</button>
+            <button class="btn-pk" onclick="hideModal()">[ 關閉 ] 返回系統</button>
         </div>
     </div>
 
     <script>
+        // 1. Firebase 初始化
+        const firebaseConfig = {
+            databaseURL: "https://carsystem-fe963-default-rtdb.asia-southeast1.firebasedatabase.app/" // <--- 替換成你的 Realtime Database 網址
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
         const grid = document.getElementById('mainGrid');
         const layer = document.getElementById('modalLayer');
         const ySel = document.getElementById('ySel');
         const mSel = document.getElementById('mSel');
-        const loading = document.getElementById('loading');
+        const syncStatus = document.getElementById('sync-status');
         
-        // !!! 請在這裡替換成你的 Google API 網址 !!!
-        const API_URL = "https://carsystem-fe963-default-rtdb.asia-southeast1.firebasedatabase.app/";
-
         let db = {};
         let activeKey = "";
 
-        function showLoading() { loading.style.display = 'block'; document.body.style.pointerEvents = 'none'; }
-        function hideLoading() { loading.style.display = 'none'; document.body.style.pointerEvents = 'auto'; }
+        // 2. 即時監聽：資料庫一有變動，畫面立刻自動重畫
+        syncStatus.style.display = 'block';
+        database.ref('bookings').on('value', (snapshot) => {
+            db = snapshot.val() || {};
+            render();
+            syncStatus.innerText = "已同步雲端";
+            setTimeout(() => { syncStatus.style.display = 'none'; }, 2000);
+        }, (error) => {
+            alert("讀取失敗！請確認 Firebase 規則(Rules) 是否設為 true。");
+        });
 
-        async function init() {
-            // 初始化年份
+        function init() {
             const now = new Date();
-            const curY = now.getFullYear();
-            for(let i=curY-1; i<=curY+3; i++) ySel.add(new Option(`${i} 年`, i));
+            for(let i=2024; i<=2030; i++) ySel.add(new Option(`${i} 年`, i));
             for(let i=0; i<12; i++) mSel.add(new Option(`${i+1} 月`, i));
-
-            ySel.value = curY; 
-            mSel.value = now.getMonth();
-
-            await fetchData();
-        }
-
-        async function fetchData() {
-            showLoading();
-            try {
-                // 加入時間戳記避免快取
-                const response = await fetch(`${API_URL}?t=${new Date().getTime()}`);
-                const data = await response.json();
-                db = data;
-                render();
-            } catch (e) {
-                console.error(e);
-                alert("抓取資料失敗，請檢查網路或是 Google 部署設定。");
-            }
-            hideLoading();
+            ySel.value = now.getFullYear(); mSel.value = now.getMonth();
+            render();
         }
 
         function render() {
@@ -291,17 +238,15 @@
             const days = new Date(y, m+1, 0).getDate();
 
             ["日", "一", "二", "三", "四", "五", "六"].forEach(day => {
-                const el = document.createElement('div');
-                el.className = "grid-h"; el.innerText = day; grid.appendChild(el);
+                const el = document.createElement('div'); el.className = "grid-h"; el.innerText = day; grid.appendChild(el);
             });
 
             for(let i=0; i<first; i++) {
-                const cell = document.createElement('div');
-                cell.className = "grid-day empty"; grid.appendChild(cell);
+                const cell = document.createElement('div'); cell.className = "grid-day empty"; grid.appendChild(cell);
             }
 
             for(let i=1; i<=days; i++) {
-                // 重要：產生的 key 格式必須為 YYYY-MM-DD (補零)
+                // 強制補零格式：YYYY-MM-DD
                 const mm = (m + 1).toString().padStart(2, '0');
                 const dd = i.toString().padStart(2, '0');
                 const key = `${y}-${mm}-${dd}`;
@@ -336,47 +281,30 @@
 
         function hideModal() { layer.style.display = 'none'; }
 
-        async function save() {
+        // 3. 儲存：資料秒傳 Firebase
+        function save() {
             const val = document.getElementById('nameIn').value.trim();
-            if(!val) return alert("輸入名字後才能開始紀錄哦！");
+            if(!val) return alert("請輸入名字後再確認喔！");
             
-            showLoading();
-            try {
-                await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({ key: activeKey, name: val, action: 'save' })
-                });
-                
-                // 等待 Google 表格寫入並刷新
-                setTimeout(async () => {
-                    await fetchData();
+            syncStatus.style.display = 'block';
+            syncStatus.innerText = "正在儲存...";
+            
+            // 使用 set 直接寫入對應日期
+            database.ref('bookings/' + activeKey).set(val)
+                .then(() => {
                     hideModal();
-                }, 2000);
-            } catch (e) {
-                alert("儲存出錯");
-                hideLoading();
-            }
+                })
+                .catch(err => alert("儲存失敗：" + err.message));
         }
 
-        async function handleDel() {
+        // 4. 刪除：移除該日期節點
+        function handleDel() {
             const pw = document.getElementById('delPw').value;
             if(pw === "1234") {
-                showLoading();
-                try {
-                    await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: JSON.stringify({ key: activeKey, action: 'delete' })
-                    });
-                    setTimeout(async () => {
-                        await fetchData();
+                database.ref('bookings/' + activeKey).remove()
+                    .then(() => {
                         hideModal();
-                    }, 2000);
-                } catch (e) {
-                    alert("刪除出錯");
-                    hideLoading();
-                }
+                    });
             } else {
                 alert("! 密碼錯誤 !");
             }
