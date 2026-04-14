@@ -74,7 +74,6 @@
             color: #1c3329;
             line-height: 1.5;
         }
-        /* 右下角跳動的小箭頭 */
         .arrow {
             position: absolute; bottom: 8px; right: 8px;
             width: 0; height: 0;
@@ -83,7 +82,7 @@
             animation: bounce 0.8s infinite;
         }
 
-        /* 案由與車牌板 (Trainer Card) */
+        /* 案由與車牌板 */
         .info-panel {
             margin: 0 15px 15px;
             background: linear-gradient(135deg, #78b098 0%, #30A048 100%);
@@ -97,7 +96,7 @@
         .plate-no { font-size: 28px; font-weight: bold; letter-spacing: 1px; }
         .company-name { font-size: 11px; text-align: right; font-weight: bold; opacity: 0.9; }
 
-        /* PC 日曆區塊 (不使用黑色補全) */
+        /* PC 日曆區塊 */
         .pc-calendar {
             background: #fff;
             margin: 0 15px 30px;
@@ -116,7 +115,7 @@
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            background-color: #eee; /* 改用淡灰色做分隔線 */
+            background-color: #eee;
             gap: 1px;
             border: 1px solid #ddd;
         }
@@ -135,11 +134,11 @@
         }
         .grid-day:active { background: #e0ffd0; }
         .grid-day.booked { background: #f1ffe8; }
-        .grid-day.empty { background: transparent; pointer-events: none; } /* 日期以外顯示全白或透背景 */
+        .grid-day.empty { background: transparent; pointer-events: none; }
 
         .date-val { font-size: 16px; font-weight: bold; margin-bottom: 5px; color: #222; }
         
-        /* 人名藥丸標籤：保證三個字清楚且置中 */
+        /* 人名標籤 */
         .user-chip {
             width: 100%;
             background-color: var(--pk-name-tag);
@@ -155,7 +154,7 @@
             margin-top: auto;
         }
 
-        /* 動作選單 - Dialogue Box */
+        /* 浮動視窗 */
         .modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.7);
             display: none; justify-content: center; align-items: center; z-index: 99;
@@ -180,9 +179,18 @@
         .btn-del { background: #ff8a8a; }
 
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        
+        /* Loading 效果 */
+        .loading-overlay {
+            position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.6);
+            color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px;
+            display: none; z-index: 1000;
+        }
     </style>
 </head>
 <body>
+
+    <div id="loading" class="loading-overlay">同步中...</div>
 
     <div class="handheld-view">
         <header class="system-header">
@@ -190,7 +198,6 @@
             <p>案號：C115-A04 · 部落工程輔導</p>
         </header>
 
-        <!-- 加強設計感的車牌與廠商 -->
         <div class="info-panel">
             <div class="plate-no">AUA-7589</div>
             <div class="company-name">
@@ -198,21 +205,17 @@
             </div>
         </div>
 
-        <!-- 溫馨提示對話框 -->
         <div class="bless-box">
             <p>加油！辛苦的一天。🚀<br>別忘了也幫車子加油。⛽</p>
             <div class="arrow"></div>
         </div>
 
-        <!-- 日曆儲存區 (去黑化背景) -->
         <div class="pc-calendar">
             <div class="calendar-nav">
                 <select id="ySel" onchange="render()"></select>
                 <select id="mSel" onchange="render()"></select>
             </div>
-            <div class="calendar-grid" id="mainGrid">
-                <!-- 由 JavaScript 填充內容 -->
-            </div>
+            <div class="calendar-grid" id="mainGrid"></div>
         </div>
         
         <p style="text-align:center; padding-bottom: 20px; font-size: 12px; color: #406050; font-weight: bold;">( 點擊日期格子進行登記或管理 )</p>
@@ -220,7 +223,6 @@
 
     <!-- 浮動視窗系統 -->
     <div class="modal" id="modalLayer" onclick="hideModal()">
-        <!-- 預約介面 -->
         <div class="dialog-card" id="addWindow" onclick="event.stopPropagation()">
             <h3 id="targetDateStr">登記旅程</h3>
             <p style="font-size: 14px; margin-bottom:10px;">請在此留下您的大名：</p>
@@ -229,7 +231,6 @@
             <button class="btn-pk btn-no" onclick="hideModal()">[ 放棄 ] 離開</button>
         </div>
 
-        <!-- 管理介面 -->
         <div class="dialog-card" id="delWindow" onclick="event.stopPropagation()" style="display:none;">
             <h3>取消登記紀錄？</h3>
             <p style="font-size: 14px; margin-bottom:10px;" id="currentInfo"></p>
@@ -244,181 +245,144 @@
         const layer = document.getElementById('modalLayer');
         const ySel = document.getElementById('ySel');
         const mSel = document.getElementById('mSel');
+        const loading = document.getElementById('loading');
         
-        // !!! 請在這裡貼上你剛才複製的 Google Deploy 網頁應用程式 URL !!!
-        const API_URL = "https://script.google.com/macros/s/AKfycbwiEUt_EiNmnwstptPQ4-NDPnG5quDl5twHfqZ-x2CB96ReRJTuccH0bLAdkZuovkiG/exec"; // <-- 記得修改這裡
+        // !!! 請在這裡替換成你的 Google API 網址 !!!
+        const API_URL = "https://script.google.com/macros/s/AKfycbwivhaCiN2Dkq_21cWl8DT-9Ifp1cdSSRIRjJDQKL4PLYT0qQv4B1NGJ2LSNlnTHZT7/exec";
 
-        let db = {}; // 用於暫存從伺服器讀取的資料
-        let activeKey = ""; // 當前選取的日期 key
+        let db = {};
+        let activeKey = "";
 
-        // 顯示載入中提示 (變灰背景，禁止操作)
-        function showLoading() {
-            document.body.style.opacity = "0.5";
-            document.body.style.pointerEvents = "none";
-        }
-        // 隱藏載入中提示
-        function hideLoading() {
-            document.body.style.opacity = "1";
-            document.body.style.pointerEvents = "auto";
-        }
+        function showLoading() { loading.style.display = 'block'; document.body.style.pointerEvents = 'none'; }
+        function hideLoading() { loading.style.display = 'none'; document.body.style.pointerEvents = 'auto'; }
 
-        // 初始化日曆和選項
         async function init() {
-            // 初始化年份選單 (例如 2024-2030)
-            for(let i=2024; i<=2030; i++) ySel.add(new Option(`${i} 年`, i));
-            // 初始化月份選單 (0-11月)
+            // 初始化年份
+            const now = new Date();
+            const curY = now.getFullYear();
+            for(let i=curY-1; i<=curY+3; i++) ySel.add(new Option(`${i} 年`, i));
             for(let i=0; i<12; i++) mSel.add(new Option(`${i+1} 月`, i));
 
-            // 自動跳至當前月份
-            const now = new Date();
-            ySel.value = now.getFullYear(); 
+            ySel.value = curY; 
             mSel.value = now.getMonth();
 
-            await fetchData(); // 從雲端抓取資料
+            await fetchData();
         }
 
-        // 從 Google Apps Script API 讀取資料
         async function fetchData() {
             showLoading();
             try {
-                // 在網址後加上時間戳記，防止瀏覽器快取舊資料
+                // 加入時間戳記避免快取
                 const response = await fetch(`${API_URL}?t=${new Date().getTime()}`);
-                db = await response.json();
-                if(db.result === "error") throw new Error(db.error); // 如果 API 回傳錯誤，也當作失敗處理
-                render(); // 資料讀取成功後渲染日曆
+                const data = await response.json();
+                db = data;
+                render();
             } catch (e) {
-                console.error("Fetch data error:", e);
-                alert("資料讀取失敗，請檢查網路連接或 API 設定。");
+                console.error(e);
+                alert("抓取資料失敗，請檢查網路或是 Google 部署設定。");
             }
             hideLoading();
         }
 
-        // 渲染日曆畫面
         function render() {
-            grid.innerHTML = ""; // 清空舊日曆
+            grid.innerHTML = "";
             const y = parseInt(ySel.value), m = parseInt(mSel.value);
-            // 計算該月第一天是星期幾 (0=日, 1=一, ..., 6=六)
-            const firstDayOfMonth = new Date(y, m, 1).getDay(); 
-            // 計算該月有多少天
-            const daysInMonth = new Date(y, m+1, 0).getDate(); 
+            const first = new Date(y, m, 1).getDay();
+            const days = new Date(y, m+1, 0).getDate();
 
-            // 建立星期標題列 (日, 一, 二...)
             ["日", "一", "二", "三", "四", "五", "六"].forEach(day => {
                 const el = document.createElement('div');
-                el.className = "grid-h";
-                el.innerText = day;
-                grid.appendChild(el);
+                el.className = "grid-h"; el.innerText = day; grid.appendChild(el);
             });
 
-            // 填充該月第一天之前的空格
-            for(let i=0; i<firstDayOfMonth; i++) {
+            for(let i=0; i<first; i++) {
                 const cell = document.createElement('div');
-                cell.className = "grid-day empty"; // empty 類別讓它背景透出
-                grid.appendChild(cell);
+                cell.className = "grid-day empty"; grid.appendChild(cell);
             }
 
-            // 循環創建每一天的格子
-            for(let i=1; i<=daysInMonth; i++) {
-                // 創建日期 key，格式為 "YYYY-MM-DD" (月份 +1 因為 JS 月份從 0 開始)
-                const key = `${y}-${(m+1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`; 
-                const bookedName = db[key]; // 檢查此日期是否有預約
+            for(let i=1; i<=days; i++) {
+                // 重要：產生的 key 格式必須為 YYYY-MM-DD (補零)
+                const mm = (m + 1).toString().padStart(2, '0');
+                const dd = i.toString().padStart(2, '0');
+                const key = `${y}-${mm}-${dd}`;
                 
+                const name = db[key];
                 const cell = document.createElement('div');
-                // 如果有預約 (bookedName 存在)，加上 'booked' class
-                cell.className = `grid-day ${bookedName ? 'booked' : ''}`; 
+                cell.className = `grid-day ${name ? 'booked' : ''}`;
                 cell.innerHTML = `
                     <div class="date-val">${i}</div>
-                    ${bookedName ? `<div class="user-chip">${bookedName}</div>` : ''}
+                    ${name ? `<div class="user-chip">${name}</div>` : ''}
                 `;
-                // 點擊格子時打開操作視窗
-                cell.onclick = () => openAction(key); 
+                cell.onclick = () => openAction(key);
                 grid.appendChild(cell);
             }
         }
 
-        // 打開操作視窗 (登記或刪除)
         function openAction(key) {
-            activeKey = key; // 記錄目前操作的日期 key
-            layer.style.display = 'flex'; // 顯示浮動視窗
-
-            // 判斷是登記還是刪除
-            if(db[key]) { // 如果有預約紀錄
-                document.getElementById('addWindow').style.display='none'; // 隱藏登記視窗
-                document.getElementById('delWindow').style.display='block'; // 顯示刪除視窗
-                document.getElementById('currentInfo').innerText = `登記人員：${db[key]}`; // 顯示目前登記人
-                document.getElementById('delPw').value = ""; // 清空密碼輸入框
-            } else { // 如果沒有預約紀錄
-                document.getElementById('delWindow').style.display='none'; // 隱藏刪除視窗
-                document.getElementById('addWindow').style.display='block'; // 顯示登記視窗
-                document.getElementById('targetDateStr').innerText = activeKey + " 借車預約"; // 設定標題
-                document.getElementById('nameIn').value = ""; // 清空名字輸入框
+            activeKey = key;
+            layer.style.display = 'flex';
+            if(db[key]) {
+                document.getElementById('addWindow').style.display='none';
+                document.getElementById('delWindow').style.display='block';
+                document.getElementById('currentInfo').innerText = `登記人員：${db[key]}`;
+                document.getElementById('delPw').value = "";
+            } else {
+                document.getElementById('delWindow').style.display='none';
+                document.getElementById('addWindow').style.display='block';
+                document.getElementById('targetDateStr').innerText = key + " 借車預約";
+                document.getElementById('nameIn').value = "";
             }
         }
 
-        // 關閉浮動視窗
         function hideModal() { layer.style.display = 'none'; }
 
-        // 儲存預約 (POST 請求)
         async function save() {
             const val = document.getElementById('nameIn').value.trim();
             if(!val) return alert("輸入名字後才能開始紀錄哦！");
             
             showLoading();
             try {
-                // 使用 POST 方法發送資料到 API
                 await fetch(API_URL, {
                     method: 'POST',
-                    // mode: 'no-cors', // 某些環境下需要，但可能導致無法讀取 response
-                    headers: {
-                       'Content-Type': 'text/plain', // 告訴伺服器我們傳送的是純文字 JSON
-                    },
+                    headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({ key: activeKey, name: val, action: 'save' })
                 });
                 
-                // 寫入後，等待約 1.5 秒再重新讀取資料，確保資料已同步
+                // 等待 Google 表格寫入並刷新
                 setTimeout(async () => {
-                    await fetchData(); // 重新讀取最新資料
-                    hideModal(); // 關閉視窗
-                }, 1500); // 延遲 1.5 秒
-
+                    await fetchData();
+                    hideModal();
+                }, 2000);
             } catch (e) {
-                console.error("Save error:", e);
-                alert("儲存失敗，請再試一次");
-                hideLoading(); // 發生錯誤時顯示 loading
+                alert("儲存出錯");
+                hideLoading();
             }
         }
 
-        // 處理刪除紀錄 (POST 請求)
         async function handleDel() {
             const pw = document.getElementById('delPw').value;
-            // 這裡使用簡單的密碼驗證，生產環境請考慮更安全的驗證方式
-            if(pw === "1234") { 
+            if(pw === "1234") {
                 showLoading();
                 try {
                     await fetch(API_URL, {
                         method: 'POST',
-                        // mode: 'no-cors',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({ key: activeKey, action: 'delete' })
                     });
-                    
-                    // 刪除後，同樣等待約 1.5 秒再重新讀取
                     setTimeout(async () => {
                         await fetchData();
                         hideModal();
-                    }, 1500);
+                    }, 2000);
                 } catch (e) {
-                    console.error("Delete error:", e);
-                    alert("刪除失敗");
+                    alert("刪除出錯");
                     hideLoading();
                 }
             } else {
-                alert("! 密碼錯誤，請確認管理者指令 !");
+                alert("! 密碼錯誤 !");
             }
         }
 
-        // 程式啟動時執行 init()
-        init(); 
+        init();
     </script>
 </body>
 </html>
