@@ -246,7 +246,7 @@
     const mSel = document.getElementById('mSel');
     
     // !!! 請在這裡貼上你剛才複製的 Google API 網址 !!!
-    const API_URL = "https://script.google.com/macros/s/AKfycbzBL_-E3IQwMl9T2XrNrcu5cyFutofo5QOVyg4W_BP9nG-Bmx0RMv9tC-z9TWScwsak/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxTlczisdarmX8OhsDvYzVaXcK6932cpGHTN_x3WJp4uH41sbN3tJl0IdqfEcwj_qZY/exec";
 
     let db = {};
     let activeKey = "";
@@ -274,16 +274,19 @@
     }
 
     async function fetchData() {
-        showLoading();
-        try {
-            const response = await fetch(API_URL);
-            db = await response.json();
-            render();
-        } catch (e) {
-            alert("資料同步失敗，請檢查網路連接");
-        }
-        hideLoading();
+    showLoading();
+    try {
+        // 在網址後加上時間戳記，防止瀏覽器抓舊資料 (Cache)
+        const response = await fetch(`${API_URL}?t=${new Date().getTime()}`);
+        db = await response.json();
+        render();
+    } catch (e) {
+        console.error(e);
+        alert("資料讀取失敗");
     }
+    hideLoading();
+    }
+
 
     function render() {
         grid.innerHTML = "";
@@ -337,41 +340,55 @@
     function hideModal() { layer.style.display = 'none'; }
 
     async function save() {
-        const val = document.getElementById('nameIn').value.trim();
-        if(!val) return alert("輸入名字後才能開始紀錄哦！");
+    const val = document.getElementById('nameIn').value.trim();
+    if(!val) return alert("輸入名字後才能開始紀錄哦！");
+    
+    showLoading();
+    try {
+        // 這裡要用 POST，並且處理 Google 的 Redirect
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors', // 重要：避免 CORS 預檢失敗
+            headers: { 'Content-Type': 'text/plain' }, 
+            body: JSON.stringify({ key: activeKey, name: val, action: 'save' })
+        });
         
+        // 因為 mode: 'no-cors' 無法讀取回傳值，我們直接等待 1.5 秒後刷新
+        // 這是 Google Script 的特性，寫入需要一點點時間
+        setTimeout(async () => {
+            await fetchData();
+            hideModal();
+        }, 1500);
+
+    } catch (e) {
+        console.error(e);
+        alert("儲存失敗，請再試一次");
+        hideLoading();
+    }
+    }
+
+ async function handleDel() {
+    const pw = document.getElementById('delPw').value;
+    if(pw === "1234") {
         showLoading();
         try {
             await fetch(API_URL, {
                 method: 'POST',
-                body: JSON.stringify({ key: activeKey, name: val, action: 'save' })
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ key: activeKey, action: 'delete' })
             });
-            await fetchData(); // 存完後重新抓取
-            hideModal();
-        } catch (e) {
-            alert("儲存失敗");
-        }
-        hideLoading();
-    }
-
-    async function handleDel() {
-        const pw = document.getElementById('delPw').value;
-        if(pw === "1234") {
-            showLoading();
-            try {
-                await fetch(API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ key: activeKey, action: 'delete' })
-                });
+            setTimeout(async () => {
                 await fetchData();
                 hideModal();
-            } catch (e) {
-                alert("刪除失敗");
-            }
+            }, 1500);
+        } catch (e) {
+            alert("刪除失敗");
             hideLoading();
-        } else {
-            alert("! 密碼錯誤 !");
         }
+    } else {
+        alert("! 密碼錯誤 !");
+    }
     }
 
     init();
