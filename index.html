@@ -239,108 +239,142 @@
         </div>
     </div>
 
-    <script>
-        const grid = document.getElementById('mainGrid');
-        const layer = document.getElementById('modalLayer');
-        const ySel = document.getElementById('ySel');
-        const mSel = document.getElementById('mSel');
+ <script>
+    const grid = document.getElementById('mainGrid');
+    const layer = document.getElementById('modalLayer');
+    const ySel = document.getElementById('ySel');
+    const mSel = document.getElementById('mSel');
+    
+    // !!! 請在這裡貼上你剛才複製的 Google API 網址 !!!
+    const API_URL = "https://script.google.com/macros/s/AKfycbzqS7ur04ObNdsMSKh8K8u6nYL5dwayJlHJmAu_nm7Xv68T7cJsfRz5Sb4u-pp6BVbw/exec";
+
+    let db = {};
+    let activeKey = "";
+
+    // 顯示載入中提示
+    function showLoading() {
+        document.body.style.opacity = "0.5";
+        document.body.style.pointerEvents = "none";
+    }
+    function hideLoading() {
+        document.body.style.opacity = "1";
+        document.body.style.pointerEvents = "auto";
+    }
+
+    async function init() {
+        // 初始化年份選單
+        for(let i=2024; i<=2030; i++) ySel.add(new Option(`${i} 年`, i));
+        for(let i=0; i<12; i++) mSel.add(new Option(`${i+1} 月`, i));
+
+        const now = new Date();
+        ySel.value = now.getFullYear(); 
+        mSel.value = now.getMonth();
+
+        await fetchData(); // 從雲端抓取資料
+    }
+
+    async function fetchData() {
+        showLoading();
+        try {
+            const response = await fetch(API_URL);
+            db = await response.json();
+            render();
+        } catch (e) {
+            alert("資料同步失敗，請檢查網路連接");
+        }
+        hideLoading();
+    }
+
+    function render() {
+        grid.innerHTML = "";
+        const y = parseInt(ySel.value), m = parseInt(mSel.value);
+        const first = new Date(y, m, 1).getDay();
+        const days = new Date(y, m+1, 0).getDate();
+
+        ["日", "一", "二", "三", "四", "五", "六"].forEach(day => {
+            const el = document.createElement('div');
+            el.className = "grid-h";
+            el.innerText = day;
+            grid.appendChild(el);
+        });
+
+        for(let i=0; i<first; i++) {
+            const cell = document.createElement('div');
+            cell.className = "grid-day empty";
+            grid.appendChild(cell);
+        }
+
+        for(let i=1; i<=days; i++) {
+            const key = `${y}-${m+1}-${i}`;
+            const name = db[key];
+            const cell = document.createElement('div');
+            cell.className = `grid-day ${name ? 'booked' : ''}`;
+            cell.innerHTML = `
+                <div class="date-val">${i}</div>
+                ${name ? `<div class="user-chip">${name}</div>` : ''}
+            `;
+            cell.onclick = () => openAction(key);
+            grid.appendChild(cell);
+        }
+    }
+
+    function openAction(key) {
+        activeKey = key;
+        layer.style.display = 'flex';
+        if(db[key]) {
+            document.getElementById('addWindow').style.display='none';
+            document.getElementById('delWindow').style.display='block';
+            document.getElementById('currentInfo').innerText = `登記人員：${db[key]}`;
+            document.getElementById('delPw').value = "";
+        } else {
+            document.getElementById('delWindow').style.display='none';
+            document.getElementById('addWindow').style.display='block';
+            document.getElementById('targetDateStr').innerText = key + " 借車預約";
+            document.getElementById('nameIn').value = "";
+        }
+    }
+
+    function hideModal() { layer.style.display = 'none'; }
+
+    async function save() {
+        const val = document.getElementById('nameIn').value.trim();
+        if(!val) return alert("輸入名字後才能開始紀錄哦！");
         
-        let db = JSON.parse(localStorage.getItem('EmeraldV_Cars')) || {};
-        let activeKey = "";
-
-        function init() {
-            // 初始化 2026-2030
-            for(let i=2026; i<=2030; i++) ySel.add(new Option(`${i} 年`, i));
-            for(let i=0; i<12; i++) mSel.add(new Option(`${i+1} 月`, i));
-
-            // 自動跳至當前
-            const now = new Date();
-            const year = now.getFullYear();
-            if(year >= 2026 && year <= 2030) {
-                ySel.value = year; mSel.value = now.getMonth();
-            } else {
-                ySel.value = 2026; mSel.value = 0;
-            }
-            render();
-        }
-
-        function render() {
-            grid.innerHTML = "";
-            const y = parseInt(ySel.value), m = parseInt(mSel.value);
-            const first = new Date(y, m, 1).getDay();
-            const days = new Date(y, m+1, 0).getDate();
-
-            // 標題 (日月火水木金土)
-            ["日", "一", "二", "三", "四", "五", "六"].forEach(day => {
-                const el = document.createElement('div');
-                el.className = "grid-h";
-                el.innerText = day;
-                grid.appendChild(el);
+        showLoading();
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ key: activeKey, name: val, action: 'save' })
             });
-
-            // 填充前空格 (改為背景透出或極淡背景，無黑色)
-            for(let i=0; i<first; i++) {
-                const cell = document.createElement('div');
-                cell.className = "grid-day empty";
-                grid.appendChild(cell);
-            }
-
-            for(let i=1; i<=days; i++) {
-                const key = `${y}-${m+1}-${i}`;
-                const name = db[key];
-                const cell = document.createElement('div');
-                cell.className = `grid-day ${name ? 'booked' : ''}`;
-                cell.innerHTML = `
-                    <div class="date-val">${i}</div>
-                    ${name ? `<div class="user-chip">${name}</div>` : ''}
-                `;
-                cell.onclick = () => openAction(key);
-                grid.appendChild(cell);
-            }
-        }
-
-        function openAction(key) {
-            activeKey = key;
-            layer.style.display = 'flex';
-            if(db[key]) {
-                document.getElementById('addWindow').style.display='none';
-                document.getElementById('delWindow').style.display='block';
-                document.getElementById('currentInfo').innerText = `登記人員：${db[key]}`;
-                document.getElementById('delPw').value = "";
-            } else {
-                document.getElementById('delWindow').style.display='none';
-                document.getElementById('addWindow').style.display='block';
-                document.getElementById('targetDateStr').innerText = key + " 借車預約";
-                document.getElementById('nameIn').value = "";
-            }
-        }
-
-        function hideModal() { layer.style.display = 'none'; }
-
-        function save() {
-            const val = document.getElementById('nameIn').value.trim();
-            if(!val) return alert("輸入名字後才能開始紀錄哦！");
-            db[activeKey] = val;
-            finish();
-        }
-
-        function handleDel() {
-            const pw = document.getElementById('delPw').value;
-            if(pw === "1234") {
-                delete db[activeKey];
-                finish();
-            } else {
-                alert("! 密碼錯誤，請確認管理者指令 !");
-            }
-        }
-
-        function finish() {
-            localStorage.setItem('EmeraldV_Cars', JSON.stringify(db));
+            await fetchData(); // 存完後重新抓取
             hideModal();
-            render();
+        } catch (e) {
+            alert("儲存失敗");
         }
+        hideLoading();
+    }
 
-        init();
-    </script>
+    async function handleDel() {
+        const pw = document.getElementById('delPw').value;
+        if(pw === "1234") {
+            showLoading();
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ key: activeKey, action: 'delete' })
+                });
+                await fetchData();
+                hideModal();
+            } catch (e) {
+                alert("刪除失敗");
+            }
+            hideLoading();
+        } else {
+            alert("! 密碼錯誤 !");
+        }
+    }
+
+    init();
+</script>
 </body>
 </html>
